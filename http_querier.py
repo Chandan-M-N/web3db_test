@@ -7,34 +7,27 @@ import argparse
 
 # Function to parse command-line arguments
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Query and plot vital signs data via HTTP.")
+    parser = argparse.ArgumentParser(description="Query and plot data from an HTTP API.")
     parser.add_argument('--h', '--host', type=str, default="75.131.29.55",
                         help="Specify the API host (default: 75.131.29.55)")
-    parser.add_argument('--v', '--vital', type=str, default="heart_rate",
-                        choices=["heart_rate", "blood_pressure"],
-                        help="Specify the vital sign to query (default: heart_rate)")
+    parser.add_argument('--t', '--topic', type=str, default="heart_rate",
+                        help="Specify the topic to query (default: heart_rate)")
     return parser.parse_args()
 
 # Parse command-line arguments
 args = parse_arguments()
 selected_host = args.h
-selected_vital = args.v
+selected_topic = args.t
 
-print(f"You selected host {selected_host} and vital {selected_vital}.")
+print(f"You selected host {selected_host} and topic {selected_topic}.")
 
 # API endpoint and payload
 API_URL = f"http://{selected_host}:5100/fetch-medical"  # Host and port from command-line argument
-if selected_vital == "heart_rate":
-    VITALS_TYPE = "heart_rate"
-else:
-    VITALS_TYPE = "blood_pressure"
-PAYLOAD = {"type": VITALS_TYPE}  # Dynamic payload based on vitals type
+PAYLOAD = {"type": selected_topic}  # Dynamic payload based on the selected topic
 
 # Lists to store timestamps and values
 timestamps = []
-values = []
-sys_values = []  # For blood pressure systolic values
-dia_values = []  # For blood pressure diastolic values
+data_values = {}  # Dictionary to store values for each field (e.g., "value", "sys", "dia")
 
 # Track the last plotted med_type_id
 last_plotted_id = None
@@ -45,13 +38,12 @@ initial_timestamp = time.time()
 # Initialize Matplotlib figure
 plt.ion()
 fig, ax = plt.subplots()
-timestamps, sys_data, dia_data, y_data = [], [], [], []  # Separate lists for sys, dia, and heart rate values
 
 def fetch_data():
     """
     Fetches data from the API and updates the timestamps and values lists.
     """
-    global last_plotted_id  # Use the global variable to track the last plotted med_type_id
+    global last_plotted_id, data_values
 
     try:
         response = requests.post(API_URL, json=PAYLOAD)
@@ -72,16 +64,13 @@ def fetch_data():
                             med_type_id = int(entry["med_type_id"])  # Get the unique med_type_id
                             if timestamp >= initial_timestamp and (last_plotted_id is None or med_type_id > last_plotted_id):
                                 timestamp_str = datetime.fromtimestamp(timestamp).strftime("%H:%M:%S")
-                                if VITALS_TYPE == "heart_rate" and "value" in entry and entry["value"] is not None:
-                                    value = float(entry["value"])
-                                    timestamps.append(timestamp_str)
-                                    values.append(value)
-                                elif VITALS_TYPE == "blood_pressure" and "sys" in entry and "dia" in entry and entry["sys"] is not None and entry["dia"] is not None:
-                                    sys_value = float(entry["sys"])
-                                    dia_value = float(entry["dia"])
-                                    timestamps.append(timestamp_str)
-                                    sys_values.append(sys_value)
-                                    dia_values.append(dia_value)
+                                timestamps.append(timestamp_str)
+                                # Extract all fields except "type", "timestamp", and "med_type_id"
+                                for key, value in entry.items():
+                                    if key not in ["type", "timestamp", "med_type_id"] and value is not None:
+                                        if key not in data_values:
+                                            data_values[key] = []  # Initialize list for new field
+                                        data_values[key].append(float(value))
                                 last_plotted_id = med_type_id  # Update the last plotted med_type_id
     except Exception as e:
         print(f"Error fetching data: {e}")
@@ -97,20 +86,15 @@ def update_plot():
     # Clear the previous plot
     ax.clear()
 
-    
-
-    # Plot the data based on vitals type
-    if VITALS_TYPE == "heart_rate":
-        ax.plot(timestamps, values, marker='o', linestyle='-', label="Heart Rate (BPM)")
-        ax.set_ylabel("Heart Rate (BPM)")
-    elif VITALS_TYPE == "blood_pressure":
-        ax.plot(timestamps, sys_values, marker='o', linestyle='-', label="Systolic (mmHg)")
-        ax.plot(timestamps, dia_values, marker='o', linestyle='-', label="Diastolic (mmHg)")
-        ax.set_ylabel("Blood Pressure (mmHg)")
+    # Plot the data for each field
+    for field, values in data_values.items():
+        print(field, values[-1])
+        ax.plot(timestamps, values, marker='o', linestyle='-', label=field)
 
     # Set common plot properties
     ax.set_xlabel("Time")
-    ax.set_title(f"{VITALS_TYPE.replace('_', ' ').title()} data queried from host {selected_host}")
+    ax.set_ylabel("Value")
+    ax.set_title(f"Data queried from host {selected_host} for topic: {selected_topic}")
     ax.legend()  # Show legend for multiple lines
     plt.xticks(rotation=45)  # Rotate x-axis labels for better readability
     plt.pause(0.5)  # Refresh every 0.5 seconds

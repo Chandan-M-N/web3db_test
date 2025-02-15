@@ -5,62 +5,81 @@ import random
 import matplotlib.pyplot as plt
 from datetime import datetime
 import argparse
+import sys
 
 # Function to parse command-line arguments
 def parse_arguments():
-    parser = argparse.ArgumentParser(description="Publish and plot vital signs data via HTTP.")
+    parser = argparse.ArgumentParser(description="Publish and plot custom sensor data via HTTP.")
     parser.add_argument('--h', '--host', type=str, default="75.131.29.55",
                         help="Specify the API host (default: 75.131.29.55)")
-    parser.add_argument('--v', '--vital', type=str, default="heart_rate",
-                        choices=["heart_rate", "blood_pressure"],
-                        help="Specify the vital sign to publish (default: heart_rate)")
+    parser.add_argument('--t', '--topic', type=str, default="heart_rate",
+                        help="Specify the type of data (default: heart_rate)")
+    parser.add_argument('--v', '--vitals', type=str, default="value",
+                        help="Specify the value names for the data, separated by commas (default: value)")
+    parser.add_argument('--r', '--range', type=str, default="70,80",
+                        help="Specify the range of values for each vital, separated by commas. For multiple vitals, provide ranges like 'min1,max1,min2,max2' (default: 70,80)")
     return parser.parse_args()
+
+# Function to validate and parse ranges
+def parse_ranges(range_str, num_vitals):
+    try:
+        range_values = list(map(float, range_str.split(',')))
+    except ValueError:
+        raise ValueError("Invalid range values. Ranges must be numeric and separated by commas.")
+
+    if len(range_values) != 2 * num_vitals:
+        raise ValueError(f"Number of range values must match the number of vitals. Expected {2 * num_vitals} values, got {len(range_values)}.")
+
+    # Group ranges into pairs of (min, max)
+    ranges = []
+    for i in range(0, len(range_values), 2):
+        min_val, max_val = range_values[i], range_values[i + 1]
+        if min_val >= max_val:
+            raise ValueError(f"Invalid range: min value {min_val} must be less than max value {max_val}.")
+        ranges.append((min_val, max_val))
+
+    return ranges
 
 # Parse command-line arguments
 args = parse_arguments()
 selected_host = args.h
-selected_vital = args.v
+selected_topic = args.t
+selected_vitals = args.v.split(',')  # Split value names by comma
 
-print(f"You selected host {selected_host} and vital {selected_vital}.")
+try:
+    ranges = parse_ranges(args.r, len(selected_vitals))  # Parse and validate ranges
+except ValueError as e:
+    print(f"Error: {e}")
+    sys.exit(1)
+
+print(f"You selected host {selected_host}, topic {selected_topic}, vitals {selected_vitals}, and ranges {ranges}.")
 
 # API endpoint
 API_URL = f"http://{selected_host}:5100/add-medical"  # Host and port from command-line argument
-if selected_vital == "heart_rate":
-    VITALS_TYPE = "heart_rate"
-else:
-    VITALS_TYPE = "blood_pressure"
 
 # Initialize Matplotlib figure
 plt.ion()  # Enable interactive mode
 fig, ax = plt.subplots()
-timestamps, sys_data, dia_data, y_data = [], [], [], []  # Lists to store timestamps and sensor values
+timestamps, y_data = [], [[] for _ in selected_vitals]  # Separate lists for each value name
 
 def send_data():
     """
-    Generates a random sensor value with a timestamp, sends it to the API, and plots the data.
+    Generates random sensor values with timestamps, sends them to the API, and plots the data.
     """
-    global timestamps, y_data, sys_data, dia_data  # Declare global variables
+    global timestamps, y_data  # Declare global variables
 
     while True:
-        # Generate a simulated sensor value based on vitals type
-        if VITALS_TYPE == "heart_rate":
-            sensor_value = round(random.uniform(70, 80), 2)  # Simulated heart rate data
-            payload = {
-                "type": VITALS_TYPE,
-                "timestamp": time.time(),  # Send timestamp
-                "value": sensor_value
-            }
-        elif VITALS_TYPE == "blood_pressure":
-            sys_value = round(random.uniform(110, 130), 2)  # Simulated systolic pressure
-            dia_value = round(random.uniform(70, 90), 2)   # Simulated diastolic pressure
-            payload = {
-                "type": VITALS_TYPE,
-                "timestamp": time.time(),  # Send timestamp
-                "sys": sys_value,
-                "dia": dia_value
-            }
-        else:
-            raise ValueError(f"Unsupported vitals type: {VITALS_TYPE}")
+        # Generate sensor data based on value names and ranges
+        payload = {
+            "type": selected_topic,
+            "timestamp": time.time(),  # Send timestamp
+        }
+
+        # Generate random values within the specified ranges for each value name
+        for i, vital in enumerate(selected_vitals):
+            min_val, max_val = ranges[i]
+            payload[vital] = round(random.uniform(min_val, max_val), 2)
+            y_data[i].append(payload[vital])  # Append the value to its corresponding list
 
         # Convert timestamp to human-readable format
         timestamp = payload["timestamp"]
@@ -82,33 +101,29 @@ def send_data():
         # Update plot data
         timestamps.append(human_readable_time)  # Use human-readable time for x-axis
 
-        if VITALS_TYPE == "heart_rate":
-            y_data.append(payload["value"])  # Append heart rate value
-        elif VITALS_TYPE == "blood_pressure":
-            sys_data.append(payload["sys"])  # Append systolic value
-            dia_data.append(payload["dia"])  # Append diastolic value
-
         # Clear the previous plot
         ax.clear()
 
-        # Plot the data based on vitals type
-        if VITALS_TYPE == "heart_rate":
-            ax.plot(timestamps, y_data, marker='o', linestyle='-', label="Heart Rate (BPM)")
-            ax.set_ylabel("Heart Rate (BPM)")
-        elif VITALS_TYPE == "blood_pressure":
-            ax.plot(timestamps, sys_data, marker='o', linestyle='-', label="Systolic (mmHg)")
-            ax.plot(timestamps, dia_data, marker='o', linestyle='-', label="Diastolic (mmHg)")
-            ax.set_ylabel("Blood Pressure (mmHg)")
+        # Plot the data for each value name
+        for i, vital in enumerate(selected_vitals):
+            ax.plot(timestamps, y_data[i], marker='o', linestyle='-', label=f"{vital}")
 
         # Set common plot properties
         ax.set_xlabel("Time")
-        ax.set_title(f"{VITALS_TYPE.replace('_', ' ').title()} data published to host {selected_host}")
+        ax.set_ylabel("Value")
+        ax.set_title(f"{selected_topic.replace('_', ' ').title()} data published to host {selected_host}")
         ax.legend()  # Show legend for multiple lines
         plt.xticks(rotation=45)  # Rotate x-axis labels for better readability
         plt.pause(0.5)  # Refresh every 0.5 seconds
 
         # Wait before sending the next request
-        time.sleep(2)  # Send every 1 second
+        time.sleep(2)  # Send every 2 seconds
 
 if __name__ == "__main__":
-    send_data()
+    try:
+        send_data()
+    except KeyboardInterrupt:
+        print("Script terminated by user.")
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
