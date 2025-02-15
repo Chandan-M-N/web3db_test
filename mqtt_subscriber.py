@@ -2,31 +2,29 @@ import paho.mqtt.client as mqtt
 import json
 import matplotlib.pyplot as plt
 from datetime import datetime
+import argparse
 
-def get_user_choice(prompt, options):
-    while True:
-        choice = input(prompt)
-        if choice in options:
-            return choice
-        print("Invalid input. Please enter a valid option.")
+# Function to parse command-line arguments
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Subscribe and plot vital signs data.")
+    parser.add_argument('--h', '--host', type=str, default="75.131.29.55",
+                        help="Specify the MQTT broker host (default: 75.131.29.55)")
+    parser.add_argument('--v', '--vital', type=str, default="heart_rate",
+                        choices=["heart_rate", "blood_pressure"],
+                        help="Specify the vital sign to subscribe to (default: heart_rate)")
+    return parser.parse_args()
 
-# Ask for host selection
-host_options = {"1": "75.131.29.55", "2": "162.192.60.88"}
-host_choice = get_user_choice("Which host do you want to send data? Please choose the options:\n1. 75.131.29.55\n2. 162.192.60.88\nEnter your choice: ", host_options.keys())
-selected_host = host_options[host_choice]
-
-# Ask for vital selection
-vital_options = {"1": "Heart Rate", "2": "Blood Pressure"}
-vital_choice = get_user_choice("What vitals do you want to send?\n1. Heart Rate\n2. Blood Pressure\nEnter your choice: ", vital_options.keys())
-selected_vital = vital_options[vital_choice]
+# Parse command-line arguments
+args = parse_arguments()
+selected_host = args.h
+selected_vital = args.v
 
 print(f"You selected host {selected_host} and vital {selected_vital}.")
 
-
 # MQTT Broker Settings
-BROKER = selected_host  # Hostname from config.json
+BROKER = selected_host  # Hostname from command-line argument
 PORT = 1883
-if selected_vital == "Heart Rate":
+if selected_vital == "heart_rate":
     TOPIC = "sensor/heart_rate"
     VITALS_TYPE = "heart_rate"
 else:
@@ -65,7 +63,6 @@ def on_message(client, userdata, msg):
         
         # Append new data based on vitals type
         timestamps.append(human_readable_time)
-        print(f"Processed timestamp: {human_readable_time}")  # Debug: Print processed timestamp
         
         if VITALS_TYPE == "heart_rate":
             value = data.get("value")
@@ -73,7 +70,6 @@ def on_message(client, userdata, msg):
                 print("Error: Missing 'value' in received data")
                 return
             y_data.append(value)  # Append heart rate value
-            print(f"Processed heart rate value: {value}")  # Debug: Print processed value
         elif VITALS_TYPE == "blood_pressure":
             sys_value = data.get("sys")
             dia_value = data.get("dia")
@@ -82,7 +78,6 @@ def on_message(client, userdata, msg):
                 return
             sys_data.append(sys_value)  # Append systolic value
             dia_data.append(dia_value)  # Append diastolic value
-            print(f"Processed systolic value: {sys_value}, diastolic value: {dia_value}")  # Debug: Print processed values
         
         # Keep only the last 20 data points for visualization
         timestamps = timestamps[-20:]
@@ -103,14 +98,11 @@ def on_message(client, userdata, msg):
         
         # Set common plot properties
         ax.set_xlabel("Time")
-        ax.set_title(f"Received {VITALS_TYPE.replace('_', ' ').title()} Data Stream")
+        ax.set_title(f"{VITALS_TYPE.replace('_', ' ').title()} data received from host {selected_host}")
         ax.legend()  # Show legend for multiple lines
         plt.xticks(rotation=45)  # Rotate x-axis labels for better readability
         plt.pause(0.5)  # Refresh every 0.5 seconds
         
-        print(f"Processed and plotted data: {data}")  # Debug: Print processed and plotted data
-    else:
-        print(f"Ignored data (type mismatch): {data}")  # Debug: Print ignored data
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:

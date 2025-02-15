@@ -3,31 +3,28 @@ import time
 import matplotlib.pyplot as plt
 from datetime import datetime
 import json
+import argparse
 
-def get_user_choice(prompt, options):
-    while True:
-        choice = input(prompt)
-        if choice in options:
-            return choice
-        print("Invalid input. Please enter a valid option.")
+# Function to parse command-line arguments
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Query and plot vital signs data via HTTP.")
+    parser.add_argument('--h', '--host', type=str, default="75.131.29.55",
+                        help="Specify the API host (default: 75.131.29.55)")
+    parser.add_argument('--v', '--vital', type=str, default="heart_rate",
+                        choices=["heart_rate", "blood_pressure"],
+                        help="Specify the vital sign to query (default: heart_rate)")
+    return parser.parse_args()
 
-# Ask for host selection
-host_options = {"1": "75.131.29.55", "2": "162.192.60.88"}
-host_choice = get_user_choice("Which host do you want to send data? Please choose the options:\n1. 75.131.29.55\n2. 162.192.60.88\nEnter your choice: ", host_options.keys())
-selected_host = host_options[host_choice]
-
-# Ask for vital selection
-vital_options = {"1": "Heart Rate", "2": "Blood Pressure"}
-vital_choice = get_user_choice("What vitals do you want to send?\n1. Heart Rate\n2. Blood Pressure\nEnter your choice: ", vital_options.keys())
-selected_vital = vital_options[vital_choice]
+# Parse command-line arguments
+args = parse_arguments()
+selected_host = args.h
+selected_vital = args.v
 
 print(f"You selected host {selected_host} and vital {selected_vital}.")
 
-
-
 # API endpoint and payload
-API_URL = f"http://{selected_host}:5100/fetch-medical"  # Host and port from config.json
-if selected_vital == "Heart Rate":
+API_URL = f"http://{selected_host}:5100/fetch-medical"  # Host and port from command-line argument
+if selected_vital == "heart_rate":
     VITALS_TYPE = "heart_rate"
 else:
     VITALS_TYPE = "blood_pressure"
@@ -45,21 +42,10 @@ last_plotted_id = None
 # Get the initial timestamp when the script starts
 initial_timestamp = time.time()
 
-# Create the figure and axis once
-plt.figure(figsize=(10, 6))
-ax = plt.gca()  # Get the current axis
-if VITALS_TYPE == "heart_rate":
-    line, = ax.plot([], [], marker="o", linestyle="-", color="b", label="Heart Rate (BPM)")
-elif VITALS_TYPE == "blood_pressure":
-    sys_line, = ax.plot([], [], marker="o", linestyle="-", color="r", label="Systolic (mmHg)")
-    dia_line, = ax.plot([], [], marker="o", linestyle="-", color="g", label="Diastolic (mmHg)")
-plt.title(f"{VITALS_TYPE.replace('_', ' ').title()} Over Time (From Start Time)")
-plt.xlabel("Timestamp")
-plt.ylabel(f"{VITALS_TYPE.replace('_', ' ').title()} Values")
-plt.xticks(rotation=45)  # Rotate x-axis labels for better readability
-plt.grid(True)
-plt.legend()  # Show legend for multiple lines
-plt.tight_layout()
+# Initialize Matplotlib figure
+plt.ion()
+fig, ax = plt.subplots()
+timestamps, sys_data, dia_data, y_data = [], [], [], []  # Separate lists for sys, dia, and heart rate values
 
 def fetch_data():
     """
@@ -108,41 +94,26 @@ def update_plot():
         print("No data to plot.")
         return
 
-    # Print the new entries
-    print("Queried and response is followed by data of new entries:")
+    # Clear the previous plot
+    ax.clear()
+
+    
+
+    # Plot the data based on vitals type
     if VITALS_TYPE == "heart_rate":
-        for timestamp, value in zip(timestamps, values):
-            print(f"Timestamp: {timestamp}, Value: {value}")
+        ax.plot(timestamps, values, marker='o', linestyle='-', label="Heart Rate (BPM)")
+        ax.set_ylabel("Heart Rate (BPM)")
     elif VITALS_TYPE == "blood_pressure":
-        for timestamp, sys_value, dia_value in zip(timestamps, sys_values, dia_values):
-            print(f"Timestamp: {timestamp}, Systolic: {sys_value}, Diastolic: {dia_value}")
+        ax.plot(timestamps, sys_values, marker='o', linestyle='-', label="Systolic (mmHg)")
+        ax.plot(timestamps, dia_values, marker='o', linestyle='-', label="Diastolic (mmHg)")
+        ax.set_ylabel("Blood Pressure (mmHg)")
 
-    # Update the plot data with new points
-    if VITALS_TYPE == "heart_rate":
-        line.set_xdata(range(len(timestamps)))  # Use indices for x-axis
-        line.set_ydata(values)
-    elif VITALS_TYPE == "blood_pressure":
-        sys_line.set_xdata(range(len(timestamps)))  # Use indices for x-axis
-        sys_line.set_ydata(sys_values)
-        dia_line.set_xdata(range(len(timestamps)))  # Use indices for x-axis
-        dia_line.set_ydata(dia_values)
-
-    # Adjust the x-axis limits
-    ax.set_xlim(0, len(timestamps) - 1)
-
-    # Adjust the y-axis limits
-    if VITALS_TYPE == "heart_rate":
-        ax.set_ylim(min(values) - 1, max(values) + 1)
-    elif VITALS_TYPE == "blood_pressure":
-        ax.set_ylim(min(min(sys_values), min(dia_values)) - 1, max(max(sys_values), max(dia_values)) + 1)
-
-    # Set x-axis tick labels to timestamps
-    ax.set_xticks(range(len(timestamps)))
-    ax.set_xticklabels(timestamps, rotation=45)
-
-    # Redraw the plot
-    plt.draw()
-    plt.pause(0.1)
+    # Set common plot properties
+    ax.set_xlabel("Time")
+    ax.set_title(f"{VITALS_TYPE.replace('_', ' ').title()} data queried from host {selected_host}")
+    ax.legend()  # Show legend for multiple lines
+    plt.xticks(rotation=45)  # Rotate x-axis labels for better readability
+    plt.pause(0.5)  # Refresh every 0.5 seconds
 
 def main():
     """
