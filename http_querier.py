@@ -39,6 +39,50 @@ initial_timestamp = time.time()
 plt.ion()
 fig, ax = plt.subplots()
 
+def normalize_timestamp(timestamp_value):
+    """
+    Converts various timestamp formats to a Unix timestamp in seconds.
+    """
+    try:
+        # If it's already a float/int, check the magnitude to determine format
+        if isinstance(timestamp_value, (int, float)):
+            timestamp = float(timestamp_value)
+            # Nanoseconds (19 digits)
+            if timestamp > 1e18:
+                return timestamp / 1e9
+            # Microseconds (16 digits)
+            elif timestamp > 1e15:
+                return timestamp / 1e6
+            # Milliseconds (13 digits)
+            elif timestamp > 1e12:
+                return timestamp / 1e3
+            # Seconds (10 digits) - return as is
+            else:
+                return timestamp
+        # If it's a string, try parsing it
+        elif isinstance(timestamp_value, str):
+            try:
+                # First try parsing as float/int
+                return normalize_timestamp(float(timestamp_value))
+            except ValueError:
+                # If that fails, assume it's a datetime string
+                # Add more datetime formats here if needed
+                for fmt in [
+                    "%Y-%m-%d %H:%M:%S",
+                    "%Y-%m-%dT%H:%M:%S",
+                    "%Y-%m-%d %H:%M:%S.%f",
+                    "%Y-%m-%dT%H:%M:%S.%f",
+                ]:
+                    try:
+                        dt = datetime.strptime(timestamp_value, fmt)
+                        return dt.timestamp()
+                    except ValueError:
+                        continue
+                raise ValueError(f"Unrecognized timestamp format: {timestamp_value}")
+    except Exception as e:
+        print(f"Error normalizing timestamp {timestamp_value}: {e}")
+        return None
+
 def fetch_data():
     """
     Fetches data from the API and updates the timestamps and values lists.
@@ -48,30 +92,40 @@ def fetch_data():
     try:
         response = requests.post(API_URL, json=PAYLOAD)
         if response.status_code == 200:
-            # Step 1: Parse the outer JSON string
             outer_data = json.loads(response.text)
+            print(outer_data)
             if outer_data == "Data does not exists!!":
                 print("No data received.")
                 return
-            # Step 2: Parse the inner JSON string
-            if isinstance(outer_data, str):  # Check if the outer data is a string
-                inner_data = json.loads(outer_data)  # Parse the inner JSON string
-                if isinstance(inner_data, list):  # Ensure the inner data is a list
+            
+            if isinstance(outer_data, str):
+                inner_data = json.loads(outer_data)
+                if isinstance(inner_data, list):
                     for entry in inner_data:
-                        if "timestamp" in entry and "med_type_id" in entry:  # Validate keys
-                            # Convert timestamp to a readable format
-                            timestamp = float(entry["timestamp"])
-                            med_type_id = int(entry["med_type_id"])  # Get the unique med_type_id
-                            if timestamp >= initial_timestamp and (last_plotted_id is None or med_type_id > last_plotted_id):
-                                timestamp_str = datetime.fromtimestamp(timestamp).strftime("%H:%M:%S")
+                        if "timestamp" in entry and "med_type_id" in entry:
+                            # Convert timestamp using the new normalize_timestamp function
+                            raw_timestamp = entry["timestamp"]
+                            normalized_timestamp = normalize_timestamp(raw_timestamp)
+                            
+                            if normalized_timestamp is None:
+                                continue
+                                
+                            med_type_id = int(entry["med_type_id"])
+                            
+                            print('here')
+                            print(normalized_timestamp, initial_timestamp)
+                            
+                            if normalized_timestamp >= initial_timestamp and (last_plotted_id is None or med_type_id > last_plotted_id):
+                                print('not here')
+                                timestamp_str = datetime.fromtimestamp(normalized_timestamp).strftime("%H:%M:%S")
                                 timestamps.append(timestamp_str)
-                                # Extract all fields except "type", "timestamp", and "med_type_id"
+                                
                                 for key, value in entry.items():
                                     if key not in ["type", "timestamp", "med_type_id"] and value is not None:
                                         if key not in data_values:
-                                            data_values[key] = []  # Initialize list for new field
+                                            data_values[key] = []
                                         data_values[key].append(float(value))
-                                last_plotted_id = med_type_id  # Update the last plotted med_type_id
+                                last_plotted_id = med_type_id
     except Exception as e:
         print(f"Error fetching data: {e}")
 
