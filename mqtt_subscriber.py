@@ -13,6 +13,53 @@ def parse_arguments():
                         help="Specify the MQTT topic to subscribe to (default: sensor/heart_rate)")
     return parser.parse_args()
 
+def parse_message(payload):
+    # First try JSON format
+    try:
+        if isinstance(payload, bytes):
+            data = json.loads(payload.decode("utf-8"))
+            return data
+    except json.JSONDecodeError:
+        # If JSON fails, try key-value format
+        try:
+            if isinstance(payload, bytes):
+                payload = payload.decode("utf-8")
+                
+            # Split the string by semicolons and create a dictionary
+            pairs = payload.split(';')
+            data = {}
+            current_timestamp = None
+            
+            for pair in pairs:
+                pair = pair.strip()
+                if not pair:
+                    continue
+                    
+                key, value = pair.split('=')
+                key = key.strip()
+                value = value.strip()
+                
+                # Try to convert numeric values
+                try:
+                    value = float(value)
+                except ValueError:
+                    pass  # Keep as string if conversion fails
+                
+                # Handle timestamp specially
+                if key == 'timestamp':
+                    current_timestamp = value
+                    if 'timestamp' not in data:
+                        data['timestamp'] = value
+                else:
+                    # Store other values with their corresponding timestamp
+                    data[key] = value
+                    
+            return data
+            
+        except Exception as e:
+            print(f"Error parsing key-value format: {e}")
+            return None
+
 # Parse command-line arguments
 args = parse_arguments()
 selected_host = args.h
@@ -21,7 +68,7 @@ selected_topic = args.t
 print(f"You selected host {selected_host} and topic {selected_topic}.")
 
 # MQTT Broker Settings
-BROKER = selected_host  # Hostname from command-line argument
+BROKER = selected_host
 PORT = 1883
 
 # Initialize Matplotlib figure
@@ -33,13 +80,13 @@ data_labels = []  # List to store labels for the data being plotted
 def on_message(client, userdata, msg):
     global timestamps, y_data, data_labels
     
-    # Decode the received message
-    try:
-        data = json.loads(msg.payload.decode("utf-8"))
-        print(f"Received data: {data}")  # Debug: Print received data
-    except json.JSONDecodeError as e:
-        print(f"Error decoding JSON: {e}")
+    # Parse the received message using the new parser
+    data = parse_message(msg.payload)
+    if not data:
+        print("Error: Could not parse message")
         return
+    
+    print(f"Received data: {data}")  # Debug: Print received data
     
     # Extract timestamp and convert to human-readable format
     timestamp = data.get("timestamp")
@@ -48,7 +95,10 @@ def on_message(client, userdata, msg):
         return
     
     try:
-        human_readable_time = datetime.fromtimestamp(timestamp).strftime("%H:%M:%S")
+        # Convert timestamp to float if it's a string
+        if isinstance(timestamp, str):
+            timestamp = float(timestamp)
+        human_readable_time = datetime.fromtimestamp(timestamp/1000 if timestamp > 1e12 else timestamp).strftime("%H:%M:%S")
     except Exception as e:
         print(f"Error converting timestamp: {e}")
         return
@@ -57,18 +107,20 @@ def on_message(client, userdata, msg):
     timestamps.append(human_readable_time)
     
     # Extract data values based on the structure of the payload
-    if "value" in data:  # Single value (e.g., heart rate)
-        y_data.append([data["value"]])  # Wrap in a list for consistency
+    if "value" in data:  # Single value format
+        y_data.append([data["value"]])
         if not data_labels:
-            data_labels.append("value")  # Add label if not already present
-    else:  # Multiple values (e.g., blood pressure)
+            data_labels.append("value")
+    else:  # Multiple values format
         values = []
         for key, value in data.items():
             if key not in ["type", "timestamp"]:  # Skip metadata fields
-                values.append(value)
-                if key not in data_labels:
-                    data_labels.append(key)  # Add label if not already present
-        y_data.append(values)
+                if isinstance(value, (int, float)):  # Only plot numeric values
+                    values.append(value)
+                    if key not in data_labels:
+                        data_labels.append(key)
+        if values:  # Only append if we have numeric values
+            y_data.append(values)
     
     # Keep only the last 20 data points for visualization
     timestamps = timestamps[-20:]
@@ -79,7 +131,12 @@ def on_message(client, userdata, msg):
     
     # Plot all data values
     for i, label in enumerate(data_labels):
-        ax.plot(timestamps, [values[i] for values in y_data], marker='o', linestyle='-', label=label)
+        try:
+            values = [values[i] for values in y_data if len(values) > i]
+            if values:  # Only plot if we have values for this label
+                ax.plot(timestamps[-len(values):], values, marker='o', linestyle='-', label=label)
+        except Exception as e:
+            print(f"Error plotting {label}: {e}")
     
     # Set common plot properties
     ax.set_xlabel("Time")
