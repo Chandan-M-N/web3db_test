@@ -39,6 +39,9 @@ initial_timestamp = time.time()
 plt.ion()
 fig, ax = plt.subplots()
 
+# Maximum number of data points to display
+MAX_POINTS = 20  # You can adjust this value as needed
+
 def normalize_timestamp(timestamp_value):
     """
     Converts various timestamp formats to a Unix timestamp in seconds.
@@ -87,15 +90,13 @@ def fetch_data():
     """
     Fetches data from the API and updates the timestamps and values lists.
     """
-    global last_plotted_id, data_values
+    global last_plotted_id, data_values, timestamps
 
     try:
         response = requests.post(API_URL, json=PAYLOAD)
         if response.status_code == 200:
             outer_data = json.loads(response.text)
-            print(outer_data)
             if outer_data == "Data does not exists!!":
-                print("No data received.")
                 return
             
             if isinstance(outer_data, str):
@@ -111,12 +112,8 @@ def fetch_data():
                                 continue
                                 
                             med_type_id = int(entry["med_type_id"])
-                            
-                            print('here')
-                            print(normalized_timestamp, initial_timestamp)
-                            
+                                                        
                             if normalized_timestamp >= initial_timestamp and (last_plotted_id is None or med_type_id > last_plotted_id):
-                                print('not here')
                                 timestamp_str = datetime.fromtimestamp(normalized_timestamp).strftime("%H:%M:%S")
                                 timestamps.append(timestamp_str)
                                 
@@ -126,6 +123,13 @@ def fetch_data():
                                             data_values[key] = []
                                         data_values[key].append(float(value))
                                 last_plotted_id = med_type_id
+
+                                # Trim data to only keep the last MAX_POINTS entries
+                                if len(timestamps) > MAX_POINTS:
+                                    timestamps.pop(0)
+                                    for key in data_values:
+                                        if len(data_values[key]) > MAX_POINTS:
+                                            data_values[key].pop(0)
     except Exception as e:
         print(f"Error fetching data: {e}")
 
@@ -134,7 +138,6 @@ def update_plot():
     Updates the plot with only the new entries.
     """
     if len(timestamps) == 0:
-        print("No data to plot.")
         return
 
     # Clear the previous plot
@@ -142,7 +145,6 @@ def update_plot():
 
     # Plot the data for each field
     for field, values in data_values.items():
-        print(field, values[-1])
         ax.plot(timestamps, values, marker='o', linestyle='-', label=field)
 
     # Set common plot properties

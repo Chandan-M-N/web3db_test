@@ -77,6 +77,9 @@ fig, ax = plt.subplots()
 timestamps, y_data = [], []  # Lists to store timestamps and sensor values
 data_labels = []  # List to store labels for the data being plotted
 
+# Maximum number of data points to display
+MAX_POINTS = 20  # You can adjust this value as needed
+
 def on_message(client, userdata, msg):
     global timestamps, y_data, data_labels
     
@@ -85,9 +88,7 @@ def on_message(client, userdata, msg):
     if not data:
         print("Error: Could not parse message")
         return
-    
-    print(f"Received data: {data}")  # Debug: Print received data
-    
+        
     # Extract timestamp and convert to human-readable format
     timestamp = data.get("timestamp")
     if not timestamp:
@@ -122,9 +123,10 @@ def on_message(client, userdata, msg):
         if values:  # Only append if we have numeric values
             y_data.append(values)
     
-    # Keep only the last 20 data points for visualization
-    timestamps = timestamps[-20:]
-    y_data = y_data[-20:]
+    # Trim data to only keep the last MAX_POINTS entries
+    if len(timestamps) > MAX_POINTS:
+        timestamps.pop(0)
+        y_data.pop(0)
     
     # Clear and update plot
     ax.clear()

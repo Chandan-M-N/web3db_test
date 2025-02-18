@@ -62,6 +62,9 @@ plt.ion()  # Enable interactive mode
 fig, ax = plt.subplots()
 timestamps, y_data = [], [[] for _ in selected_vitals]  # Separate lists for each value name
 
+# Maximum number of data points to display
+MAX_POINTS = 20  # You can adjust this value as needed
+
 def send_data():
     """
     Generates random sensor values with timestamps, sends them to the API, and plots the data.
@@ -88,18 +91,19 @@ def send_data():
         try:
             # Send the POST request
             response = requests.post(API_URL, json=payload)
-            
-            # Print response status and data
-            if response.status_code == 200:
-                print(f"Sent: {json.dumps(payload)} | Response: {response.text}")
-            else:
-                print(f"Failed to send data. Status Code: {response.status_code}")
         
         except Exception as e:
             print(f"Error sending data: {e}")
 
         # Update plot data
         timestamps.append(human_readable_time)  # Use human-readable time for x-axis
+
+        # Trim data to only keep the last MAX_POINTS entries
+        if len(timestamps) > MAX_POINTS:
+            timestamps.pop(0)
+            for i in range(len(y_data)):
+                if len(y_data[i]) > MAX_POINTS:
+                    y_data[i].pop(0)
 
         # Clear the previous plot
         ax.clear()

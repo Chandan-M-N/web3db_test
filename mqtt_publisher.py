@@ -64,6 +64,9 @@ plt.ion()
 fig, ax = plt.subplots()
 timestamps, y_data = [], [[] for _ in selected_vitals]  # Separate lists for each value name
 
+# Maximum number of data points to display
+MAX_POINTS = 20  # You can adjust this value as needed
+
 def publish_data(client):
     while True:
         # Simulate sensor data based on value names
@@ -84,10 +87,16 @@ def publish_data(client):
 
         # Publish to MQTT broker
         client.publish(TOPIC, json.dumps(data))
-        print(f"Published: {data}")
 
         # Update plot data
         timestamps.append(human_readable_time)  # Use human-readable time for x-axis
+
+        # Trim data to only keep the last MAX_POINTS entries
+        if len(timestamps) > MAX_POINTS:
+            timestamps.pop(0)
+            for i in range(len(y_data)):
+                if len(y_data[i]) > MAX_POINTS:
+                    y_data[i].pop(0)
 
         # Clear the previous plot
         ax.clear()
@@ -105,7 +114,7 @@ def publish_data(client):
         plt.pause(0.5)  # Refresh every 0.5 seconds
 
         # Wait before publishing the next data point
-        time.sleep(2)
+        time.sleep(4)
 
 if __name__ == "__main__":
     client = mqtt.Client()
