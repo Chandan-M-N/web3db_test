@@ -1,11 +1,23 @@
 # Test Scripts for Web3db
 
+This repo has test scripts to test the Web3db. To know more about Web3db, please visit: https://www.web3db.org/
+
+The architecture of Web3db is shown below:
+
+
+![alt text](image.png)
+
+
+Web3db source code: https://github.com/Chandan-M-N/web3db_reloaded
+
+
 Install the requirements.
 
 ```sh
 pip install -r requirements.txt
 ```
 
+Please refer combinations to test for running the scripts. 
 
 # HTTP Publisher
 
@@ -123,7 +135,7 @@ python3 mqtt_subscriber.py --h 75.131.29.55 --t temperature
 7. If multiple data values are present, it plots each value on a separate line.
 
 
-# Combination to test.
+# Combinations to test.
 
 1. Run http_querier.py with a required host and topic. Parallely in a different terminal run the http_publisher.py by specifying the args.
 2. Run http_querier.py with a required host and topic. Parallely in a different terminal run the mqtt_publisher.py by specifying the args.
