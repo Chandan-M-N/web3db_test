@@ -71,7 +71,6 @@ def publish_data(client):
     while True:
         # Simulate sensor data based on value names
         data = {
-            "type": selected_topic,
             "timestamp": time.time(),
         }
 

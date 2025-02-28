@@ -10,8 +10,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Query and plot data from an HTTP API.")
     parser.add_argument('--h', '--host', type=str, default="75.131.29.55",
                         help="Specify the API host (default: 75.131.29.55)")
-    parser.add_argument('--t', '--topic', type=str, default="heart_rate",
-                        help="Specify the topic to query (default: heart_rate)")
+    parser.add_argument('--t', '--topic', type=str, default="sensor/heart_rate",
+                        help="Specify the topic to query (default: sensor/heart_rate)")
     return parser.parse_args()
 
 # Parse command-line arguments
@@ -22,15 +22,15 @@ selected_topic = args.t
 print(f"You selected host {selected_host} and topic {selected_topic}.")
 
 # API endpoint and payload
-API_URL = f"http://{selected_host}:5100/fetch-medical"  # Host and port from command-line argument
-PAYLOAD = {"type": selected_topic}  # Dynamic payload based on the selected topic
+API_URL = f"http://{selected_host}:5000/get-medical"  # Host and port from command-line argument
+PAYLOAD = {"time": "5 secs","topic": selected_topic}  # Dynamic payload based on the selected topic
 
 # Lists to store timestamps and values
 timestamps = []
 data_values = {}  # Dictionary to store values for each field (e.g., "value", "sys", "dia")
 
-# Track the last plotted med_type_id
-last_plotted_id = None
+# Track the last plotted timestamp
+last_plotted_timestamp = None
 
 # Get the initial timestamp when the script starts
 initial_timestamp = time.time()
@@ -90,46 +90,43 @@ def fetch_data():
     """
     Fetches data from the API and updates the timestamps and values lists.
     """
-    global last_plotted_id, data_values, timestamps
+    global last_plotted_timestamp, data_values, timestamps
 
     try:
-        response = requests.post(API_URL, json=PAYLOAD)
+        response = requests.get(API_URL, json=PAYLOAD)
         if response.status_code == 200:
             outer_data = json.loads(response.text)
             if outer_data == "Data does not exists!!":
                 return
-            
-            if isinstance(outer_data, str):
-                inner_data = json.loads(outer_data)
-                if isinstance(inner_data, list):
-                    for entry in inner_data:
-                        if "timestamp" in entry and "med_type_id" in entry:
-                            # Convert timestamp using the new normalize_timestamp function
-                            raw_timestamp = entry["timestamp"]
-                            normalized_timestamp = normalize_timestamp(raw_timestamp)
+            if isinstance(outer_data, dict) and "data" in outer_data:
+                for entry in outer_data["data"]:
+                    if "timestamp" in entry:
+                        # Convert timestamp using the new normalize_timestamp function
+                        raw_timestamp = entry["timestamp"]
+                        normalized_timestamp = normalize_timestamp(raw_timestamp)
+                        
+                        if normalized_timestamp is None:
+                            continue
                             
-                            if normalized_timestamp is None:
-                                continue
-                                
-                            med_type_id = int(entry["med_type_id"])
-                                                        
-                            if normalized_timestamp >= initial_timestamp and (last_plotted_id is None or med_type_id > last_plotted_id):
-                                timestamp_str = datetime.fromtimestamp(normalized_timestamp).strftime("%H:%M:%S")
-                                timestamps.append(timestamp_str)
-                                
-                                for key, value in entry.items():
-                                    if key not in ["type", "timestamp", "med_type_id"] and value is not None:
-                                        if key not in data_values:
-                                            data_values[key] = []
-                                        data_values[key].append(float(value))
-                                last_plotted_id = med_type_id
+                        if normalized_timestamp >= initial_timestamp and (last_plotted_timestamp is None or normalized_timestamp > last_plotted_timestamp):
+                            timestamp_str = datetime.fromtimestamp(normalized_timestamp).strftime("%H:%M:%S")
+                            timestamps.append(timestamp_str)
+                            
+                            # Iterate over all keys in the entry (except "timestamp")
+                            for key, value in entry.items():
+                                if key != "timestamp" and value is not None:
+                                    if key not in data_values:
+                                        data_values[key] = []
+                                    data_values[key].append(float(value))
+                            
+                            last_plotted_timestamp = normalized_timestamp
 
-                                # Trim data to only keep the last MAX_POINTS entries
-                                if len(timestamps) > MAX_POINTS:
-                                    timestamps.pop(0)
-                                    for key in data_values:
-                                        if len(data_values[key]) > MAX_POINTS:
-                                            data_values[key].pop(0)
+                            # Trim data to only keep the last MAX_POINTS entries
+                            if len(timestamps) > MAX_POINTS:
+                                timestamps.pop(0)
+                                for key in data_values:
+                                    if len(data_values[key]) > MAX_POINTS:
+                                        data_values[key].pop(0)
     except Exception as e:
         print(f"Error fetching data: {e}")
 
@@ -163,7 +160,7 @@ def main():
         while True:
             fetch_data()
             update_plot()
-            time.sleep(2)  # Wait for 2 seconds before the next request
+            time.sleep(1)  # Wait for 2 seconds before the next request
     except KeyboardInterrupt:
         print("Script stopped by user.")
 

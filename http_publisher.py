@@ -55,7 +55,7 @@ except ValueError as e:
 print(f"You selected host {selected_host}, topic {selected_topic}, vitals {selected_vitals}, and ranges {ranges}.")
 
 # API endpoint
-API_URL = f"http://{selected_host}:5100/add-medical"  # Host and port from command-line argument
+API_URL = f"http://{selected_host}:5000/add-medical"  # Host and port from command-line argument
 
 # Initialize Matplotlib figure
 plt.ion()  # Enable interactive mode
@@ -74,18 +74,20 @@ def send_data():
     while True:
         # Generate sensor data based on value names and ranges
         payload = {
-            "type": selected_topic,
-            "timestamp": time.time(),  # Send timestamp
+            "topic": selected_topic,
+            "payload": {
+                "timestamp": time.time(),  # Send timestamp
+            },
+            
         }
 
         # Generate random values within the specified ranges for each value name
         for i, vital in enumerate(selected_vitals):
             min_val, max_val = ranges[i]
-            payload[vital] = round(random.uniform(min_val, max_val), 2)
-            y_data[i].append(payload[vital])  # Append the value to its corresponding list
-
+            payload['payload'][vital] = round(random.uniform(min_val, max_val), 2)
+            y_data[i].append(payload['payload'][vital])  # Append the value to its corresponding list
         # Convert timestamp to human-readable format
-        timestamp = payload["timestamp"]
+        timestamp = payload["payload"]["timestamp"]
         human_readable_time = datetime.fromtimestamp(timestamp).strftime("%H:%M:%S")
 
         try:
