@@ -12,8 +12,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Publish and plot custom sensor data via HTTP.")
     parser.add_argument('--h', '--host', type=str, default="75.131.29.55",
                         help="Specify the API host (default: 75.131.29.55)")
-    parser.add_argument('--t', '--topic', type=str, default="heart_rate",
-                        help="Specify the type of data (default: heart_rate)")
+    parser.add_argument('--t', '--topic', type=str, default="sensor/heart_rate",
+                        help="Specify the type of data (default: sensor/heart_rate)")
     parser.add_argument('--v', '--vitals', type=str, default="value",
                         help="Specify the value names for the data, separated by commas (default: value)")
     parser.add_argument('--r', '--range', type=str, default="70,80",
@@ -55,7 +55,7 @@ except ValueError as e:
 print(f"You selected host {selected_host}, topic {selected_topic}, vitals {selected_vitals}, and ranges {ranges}.")
 
 # API endpoint
-API_URL = f"http://{selected_host}:5000/add-medical"  # Host and port from command-line argument
+API_URL = f"http://{selected_host}:5100/add-medical"  # Host and port from command-line argument
 
 # Initialize Matplotlib figure
 plt.ion()  # Enable interactive mode
@@ -123,7 +123,7 @@ def send_data():
         plt.pause(0.5)  # Refresh every 0.5 seconds
 
         # Wait before sending the next request
-        time.sleep(2)  # Send every 2 seconds
+        time.sleep(4)  # Send every 2 seconds
 
 if __name__ == "__main__":
     try:

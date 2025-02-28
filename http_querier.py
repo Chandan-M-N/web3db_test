@@ -8,8 +8,8 @@ import argparse
 # Function to parse command-line arguments
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Query and plot data from an HTTP API.")
-    parser.add_argument('--h', '--host', type=str, default="75.131.29.55",
-                        help="Specify the API host (default: 75.131.29.55)")
+    parser.add_argument('--h', '--host', type=str, default="129.74.152.201",
+                        help="Specify the API host (default: 129.74.152.201)")
     parser.add_argument('--t', '--topic', type=str, default="sensor/heart_rate",
                         help="Specify the topic to query (default: sensor/heart_rate)")
     return parser.parse_args()
@@ -22,7 +22,7 @@ selected_topic = args.t
 print(f"You selected host {selected_host} and topic {selected_topic}.")
 
 # API endpoint and payload
-API_URL = f"http://{selected_host}:5000/get-medical"  # Host and port from command-line argument
+API_URL = f"http://{selected_host}:5100/get-medical"  # Host and port from command-line argument
 PAYLOAD = {"time": "5 secs","topic": selected_topic}  # Dynamic payload based on the selected topic
 
 # Lists to store timestamps and values
@@ -160,7 +160,7 @@ def main():
         while True:
             fetch_data()
             update_plot()
-            time.sleep(1)  # Wait for 2 seconds before the next request
+            time.sleep(2)  # Wait for 2 seconds before the next request
     except KeyboardInterrupt:
         print("Script stopped by user.")
 
