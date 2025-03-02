@@ -9,8 +9,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Subscribe and plot data from an MQTT topic.")
     parser.add_argument('--h', '--host', type=str, default="75.131.29.55",
                         help="Specify the MQTT broker host (default: 75.131.29.55)")
-    parser.add_argument('--t', '--topic', type=str, default="sensor/heart_rate",
-                        help="Specify the MQTT topic to subscribe to (default: sensor/heart_rate)")
+    parser.add_argument('--t', '--topic', type=str, default="heart_rate",
+                        help="Specify the MQTT topic to subscribe to (default: heart_rate)")
     return parser.parse_args()
 
 def parse_message(payload):

@@ -10,8 +10,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Query and plot data from an HTTP API.")
     parser.add_argument('--h', '--host', type=str, default="129.74.152.201",
                         help="Specify the API host (default: 129.74.152.201)")
-    parser.add_argument('--t', '--topic', type=str, default="sensor/heart_rate",
-                        help="Specify the topic to query (default: sensor/heart_rate)")
+    parser.add_argument('--t', '--topic', type=str, default="heart_rate",
+                        help="Specify the topic to query (default: heart_rate)")
     return parser.parse_args()
 
 # Parse command-line arguments

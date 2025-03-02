@@ -57,7 +57,7 @@ print(f"You selected host {selected_host}, topic {selected_topic}, vitals {selec
 # MQTT Broker Settings
 BROKER = selected_host  # Hostname from command-line argument
 PORT = 1883
-TOPIC = f"sensor/{selected_topic}"
+TOPIC = f"{selected_topic}"
 
 # Initialize Matplotlib figure
 plt.ion()
@@ -79,7 +79,6 @@ def publish_data(client):
             min_val, max_val = ranges[i]
             data[vital] = round(random.uniform(min_val, max_val), 2)
             y_data[i].append(data[vital])  # Append the value to its corresponding list
-        print(data)
         # Convert timestamp to human-readable format
         timestamp = data["timestamp"]
         human_readable_time = datetime.fromtimestamp(timestamp).strftime("%H:%M:%S")

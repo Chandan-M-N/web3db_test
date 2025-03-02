@@ -12,8 +12,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description="Publish and plot custom sensor data via HTTP.")
     parser.add_argument('--h', '--host', type=str, default="75.131.29.55",
                         help="Specify the API host (default: 75.131.29.55)")
-    parser.add_argument('--t', '--topic', type=str, default="sensor/heart_rate",
-                        help="Specify the type of data (default: sensor/heart_rate)")
+    parser.add_argument('--t', '--topic', type=str, default="heart_rate",
+                        help="Specify the type of data (default: heart_rate)")
     parser.add_argument('--v', '--vitals', type=str, default="value",
                         help="Specify the value names for the data, separated by commas (default: value)")
     parser.add_argument('--r', '--range', type=str, default="70,80",
