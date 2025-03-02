@@ -93,7 +93,7 @@ def fetch_data():
     global last_plotted_timestamp, data_values, timestamps
 
     try:
-        response = requests.get(API_URL, json=PAYLOAD)
+        response = requests.post(API_URL, json=PAYLOAD)
         if response.status_code == 200:
             outer_data = json.loads(response.text)
             if outer_data == "Data does not exists!!":
